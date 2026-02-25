@@ -12,7 +12,7 @@ st.set_page_config(page_title="Bus Travel EDA Dashboard", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    /* Updated Key Metrics styling: yellow background and black text */
+    /* Updated Key Metrics styling: grey background and black text */
     .stMetric {
         background-color: #ADADAD !important;
         color: #000000 !important;
@@ -32,7 +32,7 @@ st.write("Interactive Analysis of Routes, Ticket Categories, and Fare Trends")
 
 # ================= LOAD DATA =================
 @st.cache_data
-def load_data(file_source="cleaned_bus.csv"):
+def load_data(file_source="Final_bus.csv"):
     if os.path.exists(file_source):
         try:
             df = pd.read_csv(file_source)
@@ -45,22 +45,16 @@ def load_data(file_source="cleaned_bus.csv"):
         except Exception as e:
             st.error(f"Error loading CSV: {e}")
             return None
-    return None
+    else:
+        st.error(f"File not found: `{file_source}`. Please ensure the file is placed in the same directory as this script.")
+        return None
 
+# Automatically load the data without prompting the user
 df_raw = load_data()
 
-# File Uploader as Fallback or Primary
+# Stop the app gracefully if the dataset isn't found
 if df_raw is None:
-    st.info("👋 Welcome! Please upload your `cleaned_bus.csv` file to start the analysis.")
-    uploaded_file = st.file_uploader("Upload Bus Data CSV", type=["csv"])
-    if uploaded_file:
-        df_raw = pd.read_csv(uploaded_file)
-        if "Seat Fare" in df_raw.columns:
-            df_raw["Seat Fare"] = pd.to_numeric(df_raw["Seat Fare"], errors='coerce').fillna(0)
-        if "Total Ticket Amount" in df_raw.columns:
-            df_raw["Total Ticket Amount"] = pd.to_numeric(df_raw["Total Ticket Amount"], errors='coerce').fillna(0)
-    else:
-        st.stop()
+    st.stop()
 
 # ================= STATIC COLUMN MAPPING =================
 COLUMN_MAP = {
