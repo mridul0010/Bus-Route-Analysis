@@ -80,6 +80,11 @@ The dashboard will open in your browser at `http://localhost:8501`.
 jupyter notebook travelling_analysis.ipynb
 ```
 
+### **Project Link**
+```bash
+https://bus-route-analysis.streamlit.app/
+```
+
 ## 📁 Project Structure
 
 ```
