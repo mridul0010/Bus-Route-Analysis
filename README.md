@@ -125,6 +125,47 @@ Includes additional derived columns:
 | Booking Gap Days | Number of days between booking and journey |
 | Age Group | Age demographic bucket (e.g., 18-25, 26-40) |
 
+
+### **📊 Screenshots**
+<img width="1524" height="485" alt="image" src="https://github.com/user-attachments/assets/10ad9644-5d21-4c99-8d29-0c28d85bd03b" />
+
+<img width="1916" height="820" alt="image" src="https://github.com/user-attachments/assets/715ec6ea-53bc-4db7-9aba-d158c96993b6" />
+
+<img width="1891" height="763" alt="image" src="https://github.com/user-attachments/assets/eaed05d0-1008-46bd-84ab-0e5fe08bdcba" />
+
+<img width="1919" height="823" alt="image" src="https://github.com/user-attachments/assets/5f7273d9-e561-4ef3-a117-8175d312daaf" />
+
+<img width="1919" height="763" alt="image" src="https://github.com/user-attachments/assets/ea97f780-532e-458b-9571-7a1fec38bbcd" />
+
+<img width="1911" height="701" alt="image" src="https://github.com/user-attachments/assets/9dfa172f-fec0-498c-95cc-947c441c5b56" />
+
+<img width="1892" height="762" alt="image" src="https://github.com/user-attachments/assets/4dfa0195-4a40-4d86-aea9-7715617bcb53" />
+
+<img width="1919" height="834" alt="image" src="https://github.com/user-attachments/assets/1016adac-32d4-41b1-b3f5-82cacc587292" />
+
+<img width="1530" height="464" alt="image" src="https://github.com/user-attachments/assets/221b7500-5684-4db3-a633-451be7df3967" />
+
+## 👩‍💻 Author
+
+Mridul Lata
+
+📍 Jaipur, India
+
+💼 Aspiring Data Scientist / ML Engineer
+
+🔗 www.linkedin.com/in/mridullata
+
+🔗 https://github.com/mridul0010/Customer-Churn-Prediction-Using-Machine-Learning-Deep-Learning
+
+---
+
+⭐ If you found this helpful, please give the repository a star and share your feedback!
+
+---
+
+
+
+
 ## 📄 License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
