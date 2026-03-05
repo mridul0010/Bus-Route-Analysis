@@ -151,11 +151,13 @@ Mridul Lata
 
 📍 Jaipur, India
 
-💼 Aspiring Data Scientist / ML Engineer
+💼 Aspiring Data Analyst
 
 🔗 www.linkedin.com/in/mridullata
 
-🔗 https://github.com/mridul0010/Customer-Churn-Prediction-Using-Machine-Learning-Deep-Learning
+🔗 https://github.com/mridul0010/Bus-Route-Analysis
+
+🔗 https://bus-route-analysis.streamlit.app/
 
 ---
 
