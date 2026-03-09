@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.54-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [Live Demo](https://bus-route-analysis.streamlit.app/) · [Report Bug](https://github.com/mridul0010/Bus-Route-Analysis/issues) · [Request Feature](https://github.com/mridul0010/Bus-Route-Analysis/issues)
 
@@ -130,7 +130,7 @@ Bus-Route-Analysis/
 ├── ticket.csv                  # Raw ticket-level dataset
 ├── Final_bus.csv               # Processed dataset used by the dashboard
 ├── requirements.txt            # Python dependencies
-├── LICENSE                     # GPL-3.0 license
+├── LICENSE                     # MIT license
 └── README.md                   # Project documentation
 ```
 
@@ -211,7 +211,7 @@ Contributions are welcome! If you'd like to improve this project:
 
 ## License
 
-Distributed under the **GNU General Public License v3.0**. See [`LICENSE`](LICENSE) for more information.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
 
 ---
 
