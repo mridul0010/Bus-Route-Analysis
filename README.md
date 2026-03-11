@@ -175,23 +175,17 @@ Includes all raw columns plus the following derived fields:
 
 <br>
 
-<img width="1524" height="485" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/10ad9644-5d21-4c99-8d29-0c28d85bd03b" />
+<img width="1901" height="962" alt="image" src="https://github.com/user-attachments/assets/a262c69f-b1ba-4a09-a5c2-fc2b6d422545" />
 
-<img width="1916" height="820" alt="Key Metrics" src="https://github.com/user-attachments/assets/715ec6ea-53bc-4db7-9aba-d158c96993b6" />
+<img width="1860" height="933" alt="image" src="https://github.com/user-attachments/assets/8e2de8a9-24b9-4faf-9f91-b5120db9f151" />
 
-<img width="1891" height="763" alt="Route Analysis" src="https://github.com/user-attachments/assets/eaed05d0-1008-46bd-84ab-0e5fe08bdcba" />
+<img width="1883" height="735" alt="image" src="https://github.com/user-attachments/assets/ccacd2dd-6f29-448d-9e3b-c2fec6ad0293" />
 
-<img width="1919" height="823" alt="Demographic Distribution" src="https://github.com/user-attachments/assets/5f7273d9-e561-4ef3-a117-8175d312daaf" />
+<img width="1826" height="972" alt="image" src="https://github.com/user-attachments/assets/ba9e3cb5-4736-440a-8d74-48fcdb9e9e00" />
 
-<img width="1919" height="763" alt="Fare Analysis" src="https://github.com/user-attachments/assets/ea97f780-532e-458b-9571-7a1fec38bbcd" />
+<img width="1876" height="1035" alt="image" src="https://github.com/user-attachments/assets/e1bcf357-debb-4d2c-93fb-18c438a47e8a" />
 
-<img width="1911" height="701" alt="Scatter Plot" src="https://github.com/user-attachments/assets/9dfa172f-fec0-498c-95cc-947c441c5b56" />
 
-<img width="1892" height="762" alt="Heatmap" src="https://github.com/user-attachments/assets/4dfa0195-4a40-4d86-aea9-7715617bcb53" />
-
-<img width="1919" height="834" alt="Strategic Insights" src="https://github.com/user-attachments/assets/1016adac-32d4-41b1-b3f5-82cacc587292" />
-
-<img width="1530" height="464" alt="Data Export" src="https://github.com/user-attachments/assets/221b7500-5684-4db3-a633-451be7df3967" />
 
 </details>
 
