@@ -1,201 +1,355 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
-import seaborn as sns
-import matplotlib.pyplot as plt
-import os
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-# ================= PAGE CONFIG =================
-st.set_page_config(page_title="Bus Travel EDA Dashboard", layout="wide")
+# ======================== PAGE CONFIG ========================
+st.set_page_config(
+    page_title="Freshbus Travel Analysis",
+    page_icon="🚌",
+    layout="wide",
+)
 
-# --- CUSTOM CSS ---
 st.markdown("""
-    <style>
-    .main { background-color: #f8f9fa; }
-    /* Updated Key Metrics styling: grey background and black text */
-    .stMetric {
-        background-color: #ADADAD !important;
-        color: #000000 !important;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    /* Ensure label and value within metric are also black */
-    [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {
-        color: #000000 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("🚌 Bus Travel Data — EDA Dashboard")
-st.write("Interactive Analysis of Routes, Ticket Categories, and Fare Trends")
-
-# ================= LOAD DATA =================
-@st.cache_data
-def load_data(file_source="Final_bus.csv"):
-    if os.path.exists(file_source):
-        try:
-            df = pd.read_csv(file_source)
-            # Ensure numeric conversion for fare columns
-            if "Seat Fare" in df.columns:
-                df["Seat Fare"] = pd.to_numeric(df["Seat Fare"], errors='coerce').fillna(0)
-            if "Total Ticket Amount" in df.columns:
-                df["Total Ticket Amount"] = pd.to_numeric(df["Total Ticket Amount"], errors='coerce').fillna(0)
-            return df
-        except Exception as e:
-            st.error(f"Error loading CSV: {e}")
-            return None
-    else:
-        st.error(f"File not found: `{file_source}`. Please ensure the file is placed in the same directory as this script.")
-        return None
-
-# Automatically load the data without prompting the user
-df_raw = load_data()
-
-# Stop the app gracefully if the dataset isn't found
-if df_raw is None:
-    st.stop()
-
-# ================= STATIC COLUMN MAPPING =================
-COLUMN_MAP = {
-    "Encode Route": "Route",
-    "Category": "Category",
-    "Time Of Travel": "Time_of_Travel",
-    "Seat Fare": "Seat Fare",
-    "Total Ticket Amount": "Total_Amount",
-    "Gender": "Gender",
-    "Age Group": "Age_Group"
+<style>
+[data-testid="stMetric"] {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 18px;
+    border-radius: 12px;
 }
+[data-testid="stMetricLabel"], [data-testid="stMetricValue"],
+[data-testid="stMetricDelta"] {
+    color: #fff !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Rename for internal logic - only renames columns that exist in df_raw
-df = df_raw.copy().rename(columns=COLUMN_MAP)
+# ======================== DATA LOADING & PREPROCESSING ========================
 
-# Ensure required columns exist after renaming to avoid calculation errors
-required_cols = ["Route", "Category", "Time_of_Travel", "Seat Fare", "Total_Amount", "Gender", "Age_Group"]
-for col in required_cols:
-    if col not in df.columns:
-        df[col] = "N/A" if col not in ["Seat Fare", "Total_Amount"] else 0
+@st.cache_data
+def load_and_preprocess():
+    """Load ticket.csv and replicate the notebook preprocessing pipeline."""
+    df = pd.read_csv("ticket.csv")
 
-# ================= FILTERS =================
+    # --- Route extraction ---
+    df["Route"] = df["Service Number"].apply(lambda t: "-".join(t.split("-")[:2]))
+
+    # --- Sleeper / Seater flag ---
+    df["isSleeper"] = df["Service Number"].str.contains("SL").astype(int)
+    df["Bus Type"] = df["isSleeper"].map({0: "Seater", 1: "Sleeper"})
+
+    # --- Departure time & time bucket ---
+    df["Departure Time"] = df["Service Number"].apply(
+        lambda t: f"{t.split('-')[-1][:2]}:{t.split('-')[-1][2:]}"
+    )
+
+    def time_bucket(t):
+        if "05:00" < t <= "09:00":
+            return "Early Morning"
+        elif "09:00" < t <= "16:00":
+            return "Day Service"
+        elif "16:00" < t <= "21:00":
+            return "Evening"
+        return "Overnight"
+
+    df["Time Of Travel"] = df["Departure Time"].apply(time_bucket)
+
+    # --- Datetime conversions ---
+    df["Departure Date Time"] = pd.to_datetime(
+        df["Journey Date"] + " " + df["Departure Time"], format="mixed"
+    )
+    df["Booked Date Time"] = pd.to_datetime(df["Booked Date Time"], format="mixed")
+    df["Journey Date Time"] = pd.to_datetime(df["Journey Date Time"], format="mixed")
+
+    # --- Booking gap ---
+    df["Booking Gap Days"] = (df["Journey Date Time"] - df["Booked Date Time"]).dt.days
+
+    # --- Age groups ---
+    df["Age Group"] = pd.cut(
+        df["Age"],
+        bins=[1, 17, 25, 40, 60, 100],
+        labels=["1-17", "18-25", "26-40", "41-60", "60+"],
+    )
+
+    # --- Cleanup ---
+    df.drop(columns=["Journey Date", "Departure Time"], inplace=True)
+
+    return df
+
+
+df = load_and_preprocess()
+
+# ======================== SIDEBAR FILTERS ========================
 st.sidebar.header("🔎 Filters")
 
-route_filter = st.sidebar.multiselect("Select Route", sorted(df["Route"].unique()))
-category_filter = st.sidebar.multiselect("Select Category", sorted(df["Category"].unique()))
-time_filter = st.sidebar.multiselect("Select Time of Travel", sorted(df["Time_of_Travel"].unique()))
-gender_filter = st.sidebar.multiselect("Select Gender", sorted(df["Gender"].astype(str).unique()))
-age_filter = st.sidebar.multiselect("Select Age Group", sorted(df["Age_Group"].astype(str).unique()))
+routes = sorted(df["Route"].unique())
+categories = sorted(df["Category"].unique())
+times = ["Early Morning", "Day Service", "Evening", "Overnight"]
+genders = sorted(df["Gender"].unique())
+age_groups = ["1-17", "18-25", "26-40", "41-60", "60+"]
 
-filtered_df = df.copy()
+sel_routes = st.sidebar.multiselect("Route", routes)
+sel_categories = st.sidebar.multiselect("Category", categories)
+sel_times = st.sidebar.multiselect("Time of Travel", times)
+sel_bus = st.sidebar.multiselect("Bus Type", ["Seater", "Sleeper"])
+sel_genders = st.sidebar.multiselect("Gender", genders)
+sel_ages = st.sidebar.multiselect("Age Group", age_groups)
+fare_range = st.sidebar.slider(
+    "Seat Fare Range (₹)",
+    int(df["Seat Fare"].min()),
+    int(df["Seat Fare"].max()),
+    (int(df["Seat Fare"].min()), int(df["Seat Fare"].max())),
+)
 
-if route_filter:
-    filtered_df = filtered_df[filtered_df["Route"].isin(route_filter)]
-if category_filter:
-    filtered_df = filtered_df[filtered_df["Category"].isin(category_filter)]
-if time_filter:
-    filtered_df = filtered_df[filtered_df["Time_of_Travel"].isin(time_filter)]
-if gender_filter:
-    filtered_df = filtered_df[filtered_df["Gender"].isin(gender_filter)]
-if age_filter:
-    filtered_df = filtered_df[filtered_df["Age_Group"].isin(age_filter)]
+fdf = df.copy()
+if sel_routes:
+    fdf = fdf[fdf["Route"].isin(sel_routes)]
+if sel_categories:
+    fdf = fdf[fdf["Category"].isin(sel_categories)]
+if sel_times:
+    fdf = fdf[fdf["Time Of Travel"].isin(sel_times)]
+if sel_bus:
+    fdf = fdf[fdf["Bus Type"].isin(sel_bus)]
+if sel_genders:
+    fdf = fdf[fdf["Gender"].isin(sel_genders)]
+if sel_ages:
+    fdf = fdf[fdf["Age Group"].astype(str).isin(sel_ages)]
+fdf = fdf[(fdf["Seat Fare"] >= fare_range[0]) & (fdf["Seat Fare"] <= fare_range[1])]
 
-# ================= KPI CARDS =================
-st.subheader("📊 Key Metrics")
-col1, col2, col3, col4 = st.columns(4)
+n = len(fdf)
 
-# Handle empty dataframe cases to prevent 'NaN'
-total_tickets = len(filtered_df)
-avg_fare = filtered_df['Seat Fare'].mean() if total_tickets > 0 else 0
-total_rev = filtered_df['Total_Amount'].sum() if total_tickets > 0 else 0
-max_book = filtered_df['Total_Amount'].max() if total_tickets > 0 else 0
+# ======================== HEADER ========================
+st.title("🚌 Freshbus — Travel & Booking Analysis Dashboard")
+st.caption("Interactive dashboard based on the Freshbus ticket dataset")
 
-with col1:
-    st.metric("Total Tickets", f"{total_tickets:,}")
-with col2:
-    st.metric("Avg Seat Fare", f"₹{round(float(avg_fare), 2)}")
-with col3:
-    st.metric("Total Revenue", f"₹{round(float(total_rev), 2):,}")
-with col4:
-    st.metric("Max Booking", f"₹{round(float(max_book), 2):,}")
+# ======================== KPI CARDS ========================
+k1, k2, k3, k4, k5 = st.columns(5)
+k1.metric("Total Tickets", f"{n:,}")
+k2.metric("Avg Fare", f"₹{fdf['Seat Fare'].mean():,.0f}" if n else "—")
+k3.metric("Total Revenue", f"₹{fdf['Total Ticket Amount'].sum():,.0f}" if n else "—")
+k4.metric("Unique Routes", fdf["Route"].nunique())
+k5.metric("Avg Booking Gap", f"{fdf['Booking Gap Days'].mean():.1f} days" if n else "—")
 
-# ================= REVENUE & FARE ANALYSIS =================
-st.divider()
-c1, c2 = st.columns(2)
+if n == 0:
+    st.warning("No data matches the current filters. Adjust filters in the sidebar.")
+    st.stop()
 
-if total_tickets > 0:
+# ======================== TAB LAYOUT ========================
+tab_overview, tab_routes, tab_demographics, tab_booking, tab_data = st.tabs(
+    ["📊 Overview", "🛣️ Route Analysis", "👥 Demographics", "🕐 Booking Behaviour", "📋 Data"]
+)
+
+# ------------------------------------------------------------------ #
+# TAB 1 — OVERVIEW
+# ------------------------------------------------------------------ #
+with tab_overview:
+    st.subheader("Bus Type Preference (Seater vs Sleeper)")
+    c1, c2 = st.columns(2)
     with c1:
-        st.subheader("💺 Category: Seat Fare vs Total Amount")
-        cat_means = filtered_df.groupby("Category")[["Seat Fare", "Total_Amount"]].mean().reset_index()
-        fig1 = px.bar(cat_means, x="Category", y=["Seat Fare", "Total_Amount"], 
-                     barmode='group', color_discrete_sequence=px.colors.qualitative.Prism)
-        st.plotly_chart(fig1, use_container_width=True)
-
+        bus_counts = fdf["Bus Type"].value_counts().reset_index()
+        bus_counts.columns = ["Bus Type", "Bookings"]
+        fig = px.pie(bus_counts, names="Bus Type", values="Bookings",
+                     hole=0.45, color_discrete_sequence=px.colors.qualitative.Set2)
+        fig.update_layout(margin=dict(t=30, b=30))
+        st.plotly_chart(fig, use_container_width=True)
     with c2:
-        st.subheader("🛣️ Top 10 Routes by Revenue")
-        route_rev = filtered_df.groupby("Route")["Total_Amount"].sum().sort_values(ascending=False).head(10).reset_index()
-        fig2 = px.bar(route_rev, x="Route", y="Total_Amount", color="Total_Amount", color_continuous_scale='Viridis')
-        st.plotly_chart(fig2, use_container_width=True)
+        fig = px.bar(bus_counts, x="Bus Type", y="Bookings",
+                     color="Bus Type", color_discrete_sequence=px.colors.qualitative.Set2)
+        st.plotly_chart(fig, use_container_width=True)
 
-    # ================= DEMOGRAPHICS & CORRELATION =================
     st.divider()
-    d1, d2 = st.columns(2)
 
-    with d1:
-        st.subheader("👥 Demographic Distribution")
-        demo_tab1, demo_tab2 = st.tabs(["Age Group Revenue", "Gender Distribution"])
-        
-        with demo_tab1:
-            age_gen_rev = filtered_df.groupby(["Age_Group", "Gender"])["Total_Amount"].sum().reset_index()
-            fig3 = px.bar(age_gen_rev, x="Age_Group", y="Total_Amount", color="Gender", barmode="group")
-            st.plotly_chart(fig3, use_container_width=True)
-        
-        with demo_tab2:
-            gender_counts = filtered_df["Gender"].value_counts().reset_index()
-            gender_counts.columns = ["Gender", "Count"]
-            fig_pie = px.pie(gender_counts, values="Count", names="Gender", 
-                             hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
-            st.plotly_chart(fig_pie, use_container_width=True)
+    st.subheader("Seat Fare Distribution")
+    c1, c2 = st.columns(2)
+    with c1:
+        fig = px.histogram(fdf, x="Seat Fare", nbins=40, marginal="box",
+                           color_discrete_sequence=["#667eea"])
+        fig.update_layout(bargap=0.05)
+        st.plotly_chart(fig, use_container_width=True)
+    with c2:
+        fig = px.box(fdf, y="Seat Fare", color="Bus Type",
+                     color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.plotly_chart(fig, use_container_width=True)
 
-    with d2:
-        st.subheader("🎯 Seat Fare vs Transaction Total")
-        fig4 = px.scatter(filtered_df, x="Seat Fare", y="Total_Amount", color="Category", 
-                         hover_data=["Route"], opacity=0.6)
-        st.plotly_chart(fig4, use_container_width=True)
-
-    # ================= HEATMAP =================
     st.divider()
-    st.subheader("🔥 Route × Time Volume Heatmap")
-    top_10 = filtered_df["Route"].value_counts().nlargest(10).index
-    heatmap_data = filtered_df[filtered_df["Route"].isin(top_10)]
 
-    if not heatmap_data.empty:
-        pivot = pd.pivot_table(heatmap_data, values="Total_Amount", index="Route", 
-                               columns="Time_of_Travel", aggfunc="count").fillna(0)
-        fig_map, ax = plt.subplots(figsize=(10, 5))
-        sns.heatmap(pivot, annot=True, fmt='g', cmap="YlGnBu", ax=ax)
-        st.pyplot(fig_map)
-    else:
-        st.info("Filter selection is too narrow for a heatmap.")
+    st.subheader("Bookings by Time of Travel")
+    time_counts = fdf["Time Of Travel"].value_counts().reindex(times).reset_index()
+    time_counts.columns = ["Time Of Travel", "Bookings"]
+    fig = px.bar(time_counts, x="Time Of Travel", y="Bookings",
+                 color="Time Of Travel", color_discrete_sequence=px.colors.qualitative.Vivid)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # ================= DYNAMIC INSIGHTS =================
+# ------------------------------------------------------------------ #
+# TAB 2 — ROUTE ANALYSIS
+# ------------------------------------------------------------------ #
+with tab_routes:
+    st.subheader("Top 10 Routes by Ticket Count")
+    top10 = fdf["Route"].value_counts().head(10).reset_index()
+    top10.columns = ["Route", "Tickets"]
+    fig = px.bar(top10, x="Route", y="Tickets", color="Tickets",
+                 color_continuous_scale="Viridis")
+    st.plotly_chart(fig, use_container_width=True)
+
     st.divider()
+
+    # Revenue by Route × Category
+    st.subheader("Revenue by Route & Category")
+    rev_rc = fdf.groupby(["Route", "Category"])["Total Ticket Amount"].sum().reset_index()
+    fig = px.bar(rev_rc, x="Route", y="Total Ticket Amount", color="Category",
+                 barmode="group", color_discrete_sequence=px.colors.qualitative.Prism)
+    fig.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Revenue by Route × Time of Travel
+    st.subheader("Revenue by Route & Time of Travel")
+    rev_rt = fdf.groupby(["Route", "Time Of Travel"])["Total Ticket Amount"].sum().reset_index()
+    fig = px.bar(rev_rt, x="Route", y="Total Ticket Amount", color="Time Of Travel",
+                 barmode="group", color_discrete_sequence=px.colors.qualitative.Bold)
+    fig.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Heatmaps
+    st.subheader("Revenue Heatmap — Route × Time of Travel")
+    pivot_rev = pd.pivot_table(fdf, values="Total Ticket Amount",
+                               index="Route", columns="Time Of Travel", aggfunc="sum").fillna(0)
+    fig = px.imshow(pivot_rev, text_auto=".0f", color_continuous_scale="YlOrRd", aspect="auto")
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Booking Volume Heatmap — Route × Time of Travel")
+    pivot_cnt = pd.pivot_table(fdf, values="Ticket No",
+                               index="Route", columns="Time Of Travel", aggfunc="count").fillna(0)
+    fig = px.imshow(pivot_cnt, text_auto=".0f", color_continuous_scale="Viridis", aspect="auto")
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
+
+# ------------------------------------------------------------------ #
+# TAB 3 — DEMOGRAPHICS
+# ------------------------------------------------------------------ #
+with tab_demographics:
+    st.subheader("Bookings by Age Group")
+    c1, c2 = st.columns(2)
+    with c1:
+        age_counts = fdf["Age Group"].value_counts().sort_index().reset_index()
+        age_counts.columns = ["Age Group", "Bookings"]
+        fig = px.bar(age_counts, x="Age Group", y="Bookings",
+                     color="Age Group", color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.plotly_chart(fig, use_container_width=True)
+    with c2:
+        gender_counts = fdf["Gender"].value_counts().reset_index()
+        gender_counts.columns = ["Gender", "Bookings"]
+        fig = px.pie(gender_counts, names="Gender", values="Bookings",
+                     hole=0.4, color_discrete_sequence=px.colors.qualitative.Set1,
+                     title="Bookings by Gender")
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Age Group × Category
+    st.subheader("Age Group Distribution Across Categories")
+    age_cat = fdf.groupby(["Category", "Age Group"], observed=False).size().reset_index(name="Count")
+    fig = px.bar(age_cat, x="Category", y="Count", color="Age Group",
+                 barmode="group", color_discrete_sequence=px.colors.qualitative.Safe)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Gender × Time of Travel
+    st.subheader("Gender-wise Travel Time Preference")
+    gen_time = fdf.groupby(["Gender", "Time Of Travel"]).size().reset_index(name="Bookings")
+    fig = px.bar(gen_time, x="Time Of Travel", y="Bookings", color="Gender",
+                 barmode="group", color_discrete_sequence=px.colors.qualitative.Plotly)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Gender × Time × Age stacked
+    st.subheader("Gender Booking Pattern by Time & Age Group")
+    gen_time_age = (
+        fdf.groupby(["Gender", "Time Of Travel", "Age Group"], observed=False)
+        .size()
+        .reset_index(name="Bookings")
+    )
+    c1, c2 = st.columns(2)
+    for col_widget, g in zip([c1, c2], sorted(fdf["Gender"].unique())):
+        with col_widget:
+            sub = gen_time_age[gen_time_age["Gender"] == g]
+            fig = px.bar(sub, x="Time Of Travel", y="Bookings", color="Age Group",
+                         title=f"Gender: {g}", barmode="stack",
+                         color_discrete_sequence=px.colors.qualitative.Pastel)
+            st.plotly_chart(fig, use_container_width=True)
+
+# ------------------------------------------------------------------ #
+# TAB 4 — BOOKING BEHAVIOUR
+# ------------------------------------------------------------------ #
+with tab_booking:
+    st.subheader("Booking Gap Distribution (Days)")
+    c1, c2 = st.columns(2)
+    with c1:
+        fig = px.histogram(fdf, x="Booking Gap Days", nbins=30, marginal="violin",
+                           color_discrete_sequence=["#764ba2"])
+        fig.update_layout(bargap=0.05)
+        st.plotly_chart(fig, use_container_width=True)
+    with c2:
+        fig = px.box(fdf, x="Category", y="Booking Gap Days", color="Category",
+                     color_discrete_sequence=px.colors.qualitative.Bold)
+        fig.update_layout(showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Category × Time of Travel revenue
+    st.subheader("Revenue by Category & Time of Travel")
+    cat_time = fdf.groupby(["Category", "Time Of Travel"])["Total Ticket Amount"].sum().reset_index()
+    fig = px.bar(cat_time, x="Category", y="Total Ticket Amount", color="Time Of Travel",
+                 barmode="group", color_discrete_sequence=px.colors.qualitative.Vivid)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Fare vs Total Amount scatter
+    st.subheader("Seat Fare vs Total Ticket Amount")
+    fig = px.scatter(fdf, x="Seat Fare", y="Total Ticket Amount",
+                     color="Category", hover_data=["Route", "Bus Type"],
+                     opacity=0.6, color_discrete_sequence=px.colors.qualitative.Prism)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Strategic insights
     st.subheader("🧠 Strategic Insights")
+    top_route = fdf["Route"].mode().iloc[0]
+    top_time = fdf["Time Of Travel"].mode().iloc[0]
+    dominant_gender = fdf["Gender"].mode().iloc[0]
+    dominant_age = fdf["Age Group"].mode().iloc[0]
+    multi_seat_pct = (fdf["Total Ticket Amount"] > fdf["Seat Fare"]).mean() * 100
+    avg_gap = fdf["Booking Gap Days"].mean()
 
-    top_route = filtered_df["Route"].mode().values[0] if not filtered_df["Route"].empty else "N/A"
-    top_time = filtered_df["Time_of_Travel"].mode().values[0] if not filtered_df["Time_of_Travel"].empty else "N/A"
-    dominant_gender = filtered_df["Gender"].mode().values[0] if not filtered_df["Gender"].empty else "N/A"
-    multi_seat_perc = (filtered_df["Total_Amount"] > filtered_df["Seat Fare"]).mean() * 100
-    
     st.markdown(f"""
-    - **Operational Lead:** The most frequently booked route is **{top_route}**, with peak travel during **{top_time}**.
-    - **Customer Profile:** Passengers are predominantly **{dominant_gender}**, with the **{filtered_df['Age_Group'].mode().values[0] if not filtered_df['Age_Group'].empty else 'N/A'}** age bracket being the most active.
-    - **Group Travel:** Approximately **{multi_seat_perc:.1f}%** of bookings are for multiple seats (where Total Amount > Seat Fare).
-    - **Yield:** The average transaction value is **₹{avg_fare:.2f}**, supported by a max transaction of **₹{max_book}**.
-    """)
+| Insight | Detail |
+|---------|--------|
+| **Most Booked Route** | {top_route} |
+| **Peak Travel Time** | {top_time} |
+| **Dominant Gender** | {dominant_gender} |
+| **Most Active Age Group** | {dominant_age} |
+| **Multi-seat Bookings** | {multi_seat_pct:.1f}% |
+| **Avg Booking Gap** | {avg_gap:.1f} days |
+""")
 
-else:
-    st.warning("No data matches the selected filters. Please adjust your criteria.")
-
-# ================= DOWNLOAD =================
-if total_tickets > 0:
-    csv = filtered_df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Filtered CSV", data=csv, file_name="filtered_bus_data.csv", mime="text/csv")
+# ------------------------------------------------------------------ #
+# TAB 5 — DATA EXPLORER
+# ------------------------------------------------------------------ #
+with tab_data:
+    st.subheader("Filtered Dataset")
+    st.dataframe(fdf, use_container_width=True, height=500)
+    csv = fdf.to_csv(index=False).encode("utf-8")
+    st.download_button("📥 Download Filtered CSV", data=csv,
+                       file_name="filtered_bus_data.csv", mime="text/csv")
